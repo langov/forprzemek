@@ -1,0 +1,536 @@
+USE [Azure_reporting]
+GO
+/****** Object:  StoredProcedure [dbo].[sp_INSERT_Staging_Costs_tags]    Script Date: 3/3/2022 11:00:18 AM ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+
+-- =============================================
+-- Author:		Przemyslaw Maciejczyk
+-- Create date: 05/11/2021
+-- Description:	Insert devops data from file using BULK to staging.
+-- =============================================
+ALTER PROCEDURE [dbo].[sp_INSERT_Staging_Costs_tags]
+
+AS
+BEGIN TRY
+	
+	DECLARE  @startTime  DATETIME ;
+	SET @startTime = Current_timestamp;
+
+	DECLARE @rowsUpdated Int;
+	
+	DECLARE @errorCode Varchar(MAX);
+
+	SET NOCOUNT ON;
+BEGIN
+BEGIN TRANSACTION
+	-- Temp table for bulk insert data
+	CREATE TABLE #StagingData(
+		[InvoiceSectionName] [nvarchar](50) NULL,
+		[AccountName] [nvarchar](50) NULL,
+		[AccountOwnerId] [nvarchar](50) NULL,
+		[SubscriptionId] [nvarchar](50) NULL,
+		[SubscriptionName] [nvarchar](50) NULL,
+		[ResourceGroup] [nvarchar](100) NULL,
+		[ResourceLocation] [nvarchar](50) NULL,
+		[Date] [datetime2](7) NULL,
+		[ProductName] [nvarchar](200) NULL,
+		[MeterCategory] [nvarchar](50) NULL,
+		[MeterSubCategory] [nvarchar](50) NULL,
+		[MeterId] [nvarchar](50) NULL,
+		[MeterName] [nvarchar](100) NULL,
+		[MeterRegion] [nvarchar](100) NULL,
+		[UnitOfMeasure] [nvarchar](50) NULL,
+		[Quantity] [nvarchar](50) NULL,
+		[EffectivePrice] [float] NULL,
+		[CostInBillingCurrency] [float] NULL,
+		[CostCenter] [nvarchar](50) NULL,
+		[ConsumedService] [nvarchar](50) NULL,
+		[ResourceId] [nvarchar](300) NULL,
+		[Tags] [nvarchar](2000) NULL,
+		[OfferId] [nvarchar](50) NULL,
+		[AdditionalInfo] [nvarchar](500) NULL,
+		[ServiceInfo1] [nvarchar](1) NULL,
+		[ServiceInfo2] [nvarchar](50) NULL,
+		[ResourceName] [nvarchar](100) NULL,
+		[ReservationId] [nvarchar](100) NULL,
+		[ReservationName] [nvarchar](100) NULL,
+		[UnitPrice] [nvarchar](50) NULL,
+		[ProductOrderId] [nvarchar](100) NULL,
+		[ProductOrderName] [nvarchar](100) NULL,
+		[Term] [nvarchar](10) NULL,
+		[PublisherType] [nvarchar](50) NULL,
+		[PublisherName] [nvarchar](50) NULL,
+		[ChargeType] [nvarchar](50) NULL,
+		[Frequency] [nvarchar](50) NULL,
+		[PricingModel] [nvarchar](10) NULL,
+		[AvailabilityZone] [nvarchar](1) NULL,
+		[BillingAccountId] [int] NULL,
+		[BillingAccountName] [nvarchar](50) NULL,
+		[BillingCurrencyCode] [nvarchar](50) NULL,
+		[BillingPeriodStartDate] [datetime2](7) NULL,
+		[BillingPeriodEndDate] [datetime2](7) NULL,
+		[BillingProfileId] [int] NULL,
+		[BillingProfileName] [nvarchar](50) NULL,
+		[InvoiceSectionId] [nvarchar](10) NULL,
+		[IsAzureCreditEligible] [nvarchar](10) NULL,
+		[PartNumber] [nvarchar](100) NULL,
+		[PayGPrice] [nvarchar](50) NULL,
+		[PlanName] [nvarchar](50) NULL,
+		[ServiceFamily] [nvarchar](50) NULL
+	) ON [PRIMARY]
+	
+    -- Bulk insert of billing data
+	BULK INSERT #StagingData from 'E:\POWER_BI\Import\Detail_Enrollment_58879762_202202_en.csv' WITH
+	(
+	FIRSTROW = 2,
+	FORMAT='CSV'
+	)
+	
+	-- get count of inserted rows
+	SET @rowsUpdated = (Select count(*) from #StagingData);
+	
+	-- clear staging costs	
+	TRUNCATE TABLE [Staging_Costs];  
+	
+	-- insert all costs without the application tags, with a blank tag or just one application from the table
+	INSERT INTO [dbo].[Staging_Costs](
+		[BillingAccountId]
+		,[BillingAccountName]
+		,[BillingPeriodStartDate]
+		,[BillingPeriodEndDate]
+		,[BillingProfileId]
+		,[BillingProfileName]
+		,[AccountOwnerId]
+		,[AccountName]
+		,[SubscriptionId]
+		,[SubscriptionName]
+		,[Date]
+		,[ProductName]
+		,[PartNumber]
+		,[MeterId]
+		,[ServiceFamily]
+		,[MeterCategory]
+		,[MeterSubCategory]
+		,[MeterRegion]
+		,[MeterName]
+		,[Quantity]
+		,[EffectivePrice]
+		,[CostInBillingCurrency]
+		,[UnitPrice]
+		,[BillingCurrencyCode]
+		,[ResourceLocation]
+		,[AvailabilityZone]
+		,[ConsumedService]
+		,[ResourceId]
+		,[ResourceName]
+		,[ServiceInfo1]
+		,[ServiceInfo2]
+		,[AdditionalInfo]
+		,[Tags]
+		,[InvoiceSectionId]
+		,[InvoiceSectionName]
+		,[CostCenter]
+		,[UnitOfMeasure]
+		,[ResourceGroup]
+		,[ReservationId]
+		,[ReservationName]
+		,[ProductOrderId]
+		,[ProductOrderName]
+		,[OfferId]
+		,[IsAzureCreditEligible]
+		,[Term]
+		,[Application]
+		,[Environment]
+		,[PublisherName]
+		,[PlanName]
+		,[ChargeType]
+		,[Frequency]
+		,[PublisherType]
+		,[PayGPrice]
+		,[PricingModel]
+		,[Transfer]
+	)
+	SELECT 
+		[BillingAccountId]
+		,[BillingAccountName]
+		,[BillingPeriodStartDate]
+		,[BillingPeriodEndDate]
+		,[BillingProfileId]
+		,[BillingProfileName]
+		,[AccountOwnerId]
+		,[AccountName]
+		,[SubscriptionId]
+		,[SubscriptionName]
+		,[Date]
+		,[ProductName]
+		,[PartNumber]
+		,[MeterId]
+		,[ServiceFamily]
+		,[MeterCategory]
+		,[MeterSubCategory]
+		,[MeterRegion]
+		,[MeterName]
+		,[Quantity]
+		,[EffectivePrice]
+		,[CostInBillingCurrency]
+		,[UnitPrice]
+		,[BillingCurrencyCode]
+		,[ResourceLocation]
+		,[AvailabilityZone]
+		,[ConsumedService]
+		,[ResourceId]
+		,[ResourceName]
+		,[ServiceInfo1]
+		,[ServiceInfo2]
+		,[AdditionalInfo]
+		,[Tags]
+		,[InvoiceSectionId]
+		,[InvoiceSectionName]
+		,[CostCenter]
+		,[UnitOfMeasure]
+		,[ResourceGroup]
+		,[ReservationId]
+		,[ReservationName]
+		,[ProductOrderId]
+		,[ProductOrderName]
+		,[OfferId]
+		,[IsAzureCreditEligible]
+		,[Term]
+		,NULL
+		,NULL
+		,[PublisherName]
+		,[PlanName]
+		,[ChargeType]
+		,[Frequency]
+		,[PublisherType]
+		,[PayGPrice]
+		,[PricingModel]
+		,0 
+	FROM #StagingData where Tags not like '%Application%'
+	OR Tags like '%Application": ""%'
+	OR Tags is null
+	
+	--delete records without the application tags, with a blank tag or just one application from the table
+	DELETE from #StagingData 
+	where Tags not like '%Application%'
+	OR Tags like '%Application": ""%'
+	OR Tags is null
+
+COMMIT TRANSACTION 
+END
+
+BEGIN
+BEGIN TRANSACTION
+-- insert all costs without just one application from the table
+	INSERT INTO [dbo].[Staging_Costs](
+		[BillingAccountId]
+		,[BillingAccountName]
+		,[BillingPeriodStartDate]
+		,[BillingPeriodEndDate]
+		,[BillingProfileId]
+		,[BillingProfileName]
+		,[AccountOwnerId]
+		,[AccountName]
+		,[SubscriptionId]
+		,[SubscriptionName]
+		,[Date]
+		,[ProductName]
+		,[PartNumber]
+		,[MeterId]
+		,[ServiceFamily]
+		,[MeterCategory]
+		,[MeterSubCategory]
+		,[MeterRegion]
+		,[MeterName]
+		,[Quantity]
+		,[EffectivePrice]
+		,[CostInBillingCurrency]
+		,[UnitPrice]
+		,[BillingCurrencyCode]
+		,[ResourceLocation]
+		,[AvailabilityZone]
+		,[ConsumedService]
+		,[ResourceId]
+		,[ResourceName]
+		,[ServiceInfo1]
+		,[ServiceInfo2]
+		,[AdditionalInfo]
+		,[Tags]
+		,[InvoiceSectionId]
+		,[InvoiceSectionName]
+		,[CostCenter]
+		,[UnitOfMeasure]
+		,[ResourceGroup]
+		,[ReservationId]
+		,[ReservationName]
+		,[ProductOrderId]
+		,[ProductOrderName]
+		,[OfferId]
+		,[IsAzureCreditEligible]
+		,[Term]
+		,[Application]
+		,[Environment]
+		,[PublisherName]
+		,[PlanName]
+		,[ChargeType]
+		,[Frequency]
+		,[PublisherType]
+		,[PayGPrice]
+		,[PricingModel]
+		,[Transfer]
+	)
+	SELECT 
+		[BillingAccountId]
+		,[BillingAccountName]
+		,[BillingPeriodStartDate]
+		,[BillingPeriodEndDate]
+		,[BillingProfileId]
+		,[BillingProfileName]
+		,[AccountOwnerId]
+		,[AccountName]
+		,[SubscriptionId]
+		,[SubscriptionName]
+		,[Date]
+		,[ProductName]
+		,[PartNumber]
+		,[MeterId]
+		,[ServiceFamily]
+		,[MeterCategory]
+		,[MeterSubCategory]
+		,[MeterRegion]
+		,[MeterName]
+		,[Quantity]
+		,[EffectivePrice]
+		,[CostInBillingCurrency]
+		,[UnitPrice]
+		,[BillingCurrencyCode]
+		,[ResourceLocation]
+		,[AvailabilityZone]
+		,[ConsumedService]
+		,[ResourceId]
+		,[ResourceName]
+		,[ServiceInfo1]
+		,[ServiceInfo2]
+		,[AdditionalInfo]
+		,[Tags]
+		,[InvoiceSectionId]
+		,[InvoiceSectionName]
+		,[CostCenter]
+		,[UnitOfMeasure]
+		,[ResourceGroup]
+		,[ReservationId]
+		,[ReservationName]
+		,[ProductOrderId]
+		,[ProductOrderName]
+		,[OfferId]
+		,[IsAzureCreditEligible]
+		,[Term]
+		,LEFT(Right(Tags,Len(Tags) - CHARINDEX('"Applicat',Tags)-15), CHARINDEX('"',Right(Tags,Len(Tags) - CHARINDEX('"Applicat',Tags)-15))-1)
+		,LEFT(Right(Tags,Len(Tags) - CHARINDEX('"Environm',Tags)-15), CHARINDEX('"',Right(Tags,Len(Tags) - CHARINDEX('"Environm',Tags)-15))-1)
+		,[PublisherName]
+		,[PlanName]
+		,[ChargeType]
+		,[Frequency]
+		,[PublisherType]
+		,[PayGPrice]
+		,[PricingModel]
+		,0 
+	FROM #StagingData where Tags not like '%Application": "%;%"%'
+	
+	--delete records without just one application from the table
+	DELETE from #StagingData 
+	where Tags not like  '%Application": "%;%"%'
+COMMIT TRANSACTION 
+END
+	-- Parse the tags
+	DECLARE @tag nvarchar(1000);
+	DECLARE @application_count bigint;
+	DECLARE @application_index bigint;
+	DECLARE @applications nvarchar (600);
+	DECLARE @app nvarchar (100);
+	DECLARE @environment nvarchar (100);
+	DECLARE @row_count bigint;
+	DECLARE @temp_rows bigint;
+
+	SET @temp_rows = (select count(*) from #StagingData);
+	SET @row_count = 0;
+
+	BEGIN TRANSACTION 
+	While (@row_count <= @temp_rows)
+	BEGIN
+
+	if @row_count % 1000 = 0
+	BEGIN
+		COMMIT TRANSACTION
+		BEGIN TRANSACTION 
+	END
+	
+		SET @row_count =  @row_count + 1;
+		SET @tag = (Select Tags from (Select ROW_NUMBER() over (ORDER BY (SELECT '1')) as ROW_ID, Tags from #StagingData)as Tags WHERE ROW_ID = @row_count);
+		SET @environment = LEFT(Right(@tag,Len(@tag) - CHARINDEX('"Environm',@tag)-15), CHARINDEX('"',Right(@tag,Len(@tag) - CHARINDEX('"Environm',@tag)-15))-1);
+		SET @applications = LEFT(Right(@tag,Len(@tag) - CHARINDEX('"Applicat',@tag)-15), CHARINDEX('"',Right(@tag,Len(@tag) - CHARINDEX('"Applicat',@tag)-15))-1);
+		SET @application_count = (Select Count(value) from STRING_SPLIT(@applications,';') where RTRIM(value) <> '');
+		SET @application_index = 1
+			While (@application_index <= @application_count)
+			BEGIN
+			SET @app = (SELECT value FROM(Select ROW_NUMBER() over (ORDER BY (SELECT '1')) as ROW_ID, value from STRING_SPLIT(@applications,';') where RTRIM(value) <> '' ) as Taging WHERE ROW_ID = @application_index);
+				SET @application_index = @application_index + 1
+
+				INSERT INTO [dbo].[Staging_Costs]
+			   ([BillingAccountId]
+			   ,[BillingAccountName]
+			   ,[BillingPeriodStartDate]
+			   ,[BillingPeriodEndDate]
+			   ,[BillingProfileId]
+			   ,[BillingProfileName]
+			   ,[AccountOwnerId]
+			   ,[AccountName]
+			   ,[SubscriptionId]
+			   ,[SubscriptionName]
+			   ,[Date]
+			   ,[ProductName]
+			   ,[PartNumber]
+			   ,[MeterId]
+			   ,[ServiceFamily]
+			   ,[MeterCategory]
+			   ,[MeterSubCategory]
+			   ,[MeterRegion]
+			   ,[MeterName]
+			   ,[Quantity]
+			   ,[EffectivePrice]
+			   ,[CostInBillingCurrency]
+			   ,[UnitPrice]
+			   ,[BillingCurrencyCode]
+			   ,[ResourceLocation]
+			   ,[AvailabilityZone]
+			   ,[ConsumedService]
+			   ,[ResourceId]
+			   ,[ResourceName]
+			   ,[ServiceInfo1]
+			   ,[ServiceInfo2]
+			   ,[AdditionalInfo]
+			   ,[Tags]
+			   ,[InvoiceSectionId]
+			   ,[InvoiceSectionName]
+			   ,[CostCenter]
+			   ,[UnitOfMeasure]
+			   ,[ResourceGroup]
+			   ,[ReservationId]
+			   ,[ReservationName]
+			   ,[ProductOrderId]
+			   ,[ProductOrderName]
+			   ,[OfferId]
+			   ,[IsAzureCreditEligible]
+			   ,[Term]
+			   ,[Application]
+			   ,[Environment]
+			   ,[PublisherName]
+			   ,[PlanName]
+			   ,[ChargeType]
+			   ,[Frequency]
+			   ,[PublisherType]
+			   ,[PayGPrice]
+			   ,[PricingModel]
+			   ,[Transfer]
+			   )
+			SELECT 
+				[BillingAccountId]
+			   ,[BillingAccountName]
+			   ,[BillingPeriodStartDate]
+			   ,[BillingPeriodEndDate]
+			   ,[BillingProfileId]
+			   ,[BillingProfileName]
+			   ,[AccountOwnerId]
+			   ,[AccountName]
+			   ,[SubscriptionId]
+			   ,[SubscriptionName]
+			   ,[Date]
+			   ,[ProductName]
+			   ,[PartNumber]
+			   ,[MeterId]
+			   ,[ServiceFamily]
+			   ,[MeterCategory]
+			   ,[MeterSubCategory]
+			   ,[MeterRegion]
+			   ,[MeterName]
+			   ,[Quantity]
+			   ,[EffectivePrice]
+			   ,[CostInBillingCurrency]/@application_count
+			   ,[UnitPrice]
+			   ,[BillingCurrencyCode]
+			   ,[ResourceLocation]
+			   ,[AvailabilityZone]
+			   ,[ConsumedService]
+			   ,[ResourceId]
+			   ,[ResourceName]
+			   ,[ServiceInfo1]
+			   ,[ServiceInfo2]
+			   ,[AdditionalInfo]
+			   ,[Tags]
+			   ,[InvoiceSectionId]
+			   ,[InvoiceSectionName]
+			   ,[CostCenter]
+			   ,[UnitOfMeasure]
+			   ,[ResourceGroup]
+			   ,[ReservationId]
+			   ,[ReservationName]
+			   ,[ProductOrderId]
+			   ,[ProductOrderName]
+			   ,[OfferId]
+			   ,[IsAzureCreditEligible]
+			   ,[Term]
+			   ,@app
+			   ,@environment
+			   ,[PublisherName]
+			   ,[PlanName]
+			   ,[ChargeType]
+			   ,[Frequency]
+			   ,[PublisherType]
+			   ,[PayGPrice]
+			   ,[PricingModel]
+			   ,0 
+			   FROM (SELECT ROW_NUMBER() over (ORDER BY (SELECT '1')) as ROW_NUM, *
+			   from #StagingData) as stage where ROW_NUM = @row_count
+			END							
+	END		 
+
+	COMMIT TRANSACTION
+	-- drop temp table
+	DROP TABLE #StagingData
+
+	-- insert information into log data
+	INSERT INTO [dbo].[Log]
+           ([Procedure name]
+           ,[Start]
+           ,[End]
+           ,[Rows_altered]
+		   ,[Uploaded]
+           )
+     VALUES
+           ('sp_INSERT_Staging_Costs'
+           ,@startTime
+           ,CURRENT_TIMESTAMP
+           ,@rowsUpdated
+		   ,CURRENT_TIMESTAMP
+		   )
+END TRY
+	-- Catch error in inserts
+BEGIN CATCH
+	INSERT INTO [dbo].[Log]
+           ([Procedure name]
+           ,[Start]
+           ,[End]
+           ,[Rows_altered]
+		   ,[Uploaded]
+           ,[Error_code])
+     VALUES
+           ('sp_INSERT_Staging_Costs'
+           ,@startTime
+           ,CURRENT_TIMESTAMP
+           ,@rowsUpdated
+		   ,CURRENT_TIMESTAMP
+		   ,ERROR_LINE() + ' - ' + ERROR_MESSAGE())
+END CATCH
